@@ -1,4 +1,6 @@
+using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public class GameManager : MonoBehaviour
@@ -106,29 +108,66 @@ public class GameManager : MonoBehaviour
     }
     public void aAlgorithm()
     {
-        int actualNodeX = startPosx;
-        int actualNodeY = startPosy;
-        while (actualNodeX != endPosx && actualNodeY != endPosy)
+        Node startCell = NodeMatrix[startPosx, startPosy];
+        Node endCell = NodeMatrix[endPosx, endPosy];
+        Node currentCell = startCell;
+
+        float aCUMulatedCost = 0; //Coste acumulado Way.ACUMulatedCost
+
+        Dictionary<Node,float> openList = new Dictionary<Node,float>();
+        List<Node> closedList = new List<Node>();
+        openList.Add(startCell, 0);
+
+        while (currentCell != endCell)
         {
-            Way bestChoice = new Way(NodeMatrix[actualNodeX, actualNodeY], 8000f);
-            foreach (Way way in NodeMatrix[actualNodeX, actualNodeY].WayList)
+            aCUMulatedCost = openList[currentCell];
+            openList.Remove(currentCell);
+            closedList.Add(currentCell);
+            foreach (Way way in currentCell.WayList)
             {
-                float realCost = way.Cost + way.NodeDestiny.Heuristic;
-                //Debug.Log(realCost);
-                if (realCost < (bestChoice.Cost + bestChoice.NodeDestiny.Heuristic))
+                if (!closedList.Contains(way.NodeDestiny))
                 {
-                    bestChoice = way;
+                    bool cellVisited = false;
+                    foreach (var node in openList)
+                    {
+                        if (node.Key == way.NodeDestiny)
+                        {
+                            cellVisited = true;
+                        }
+                    }
+                    if (!cellVisited)
+                    {
+                        way.NodeDestiny.NodeParent = currentCell;
+                        openList.Add(way.NodeDestiny,aCUMulatedCost + way.Cost);
+                    }
                 }
             }
-            Debug.Log(bestChoice.Cost + bestChoice.NodeDestiny.Heuristic);
-            actualNodeX = bestChoice.NodeDestiny.PositionX;
-            actualNodeY = bestChoice.NodeDestiny.PositionY;
-            if (actualNodeX != endPosx && actualNodeY != endPosy)
+            currentCell = openList.OrderBy(x => x.Value + x.Key.Heuristic).First().Key;
+            StartCoroutine(ShowWays(closedList,startCell,currentCell));
+        }
+    }
+    private IEnumerator ShowWays(List<Node> nodes, Node startCell, Node currentCell)
+    {
+        foreach (var node in nodes)
+        {
+            if (node != startCell)
             {
-                GameObject newOrigin = Instantiate(token, NodeMatrix[actualNodeX, actualNodeY].RealPosition, Quaternion.identity);
-                SpriteRenderer sprite = newOrigin.GetComponent<SpriteRenderer>();
-                sprite.color = Color.magenta;
+                GameObject pin = Instantiate(token, node.RealPosition, Quaternion.identity);
+                pin.GetComponent<SpriteRenderer>().color = Color.magenta;
             }
+            yield return new WaitForSeconds(0.5f);
+        }
+        StartCoroutine(ShowPath(currentCell, startCell));
+    }
+    private IEnumerator ShowPath(Node endCell, Node startCell)
+    {
+        Node currentCell = endCell.NodeParent;
+        while (currentCell != startCell)
+        {
+            GameObject pin = Instantiate(token, currentCell.RealPosition, Quaternion.identity);
+            pin.GetComponent<SpriteRenderer>().color = Color.black;
+            currentCell = currentCell.NodeParent;
+            yield return null;
         }
     }
 }
